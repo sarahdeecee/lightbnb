@@ -22,7 +22,7 @@ const pool = new Pool({
   ;`;
   return pool
     .query(queryString, [ email.toLowerCase() ])
-    .then((result) => (result.rows[0]) ? result.rows : null)
+    .then((result) => result.rows[0])
     .catch((err) => err.message);
   };
 exports.getUserWithEmail = getUserWithEmail;
