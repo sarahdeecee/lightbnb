@@ -22,9 +22,8 @@ const pool = new Pool({
   ;`;
   return pool
     .query(queryString, [ email.toLowerCase() ])
-    .then((result) => result.rows[0])
-    .catch(null);
-    // .catch((err) => err.message);
+    .then((result) => (result.rows[0]) ? result.rows : null)
+    .catch((err) => err.message);
   };
 exports.getUserWithEmail = getUserWithEmail;
 
@@ -35,12 +34,13 @@ exports.getUserWithEmail = getUserWithEmail;
  */
 
 const getUserWithId = (id) => {
+  const values = [ id ];
   const queryString = `
     SELECT * FROM users
     WHERE id = $1
   ;`;
   return pool
-    .query(queryString, [ id ])
+    .query(queryString, values)
     .then(result => result.rows[0])
     .catch(err => err.message);
   };
@@ -53,13 +53,11 @@ exports.getUserWithId = getUserWithId;
  * @return {Promise<{}>} A promise to the user.
  */
  const addUser = user => {
-  console.log(user);
+  const values = [ user.name, user.email, user.password ];
   const queryString = `
     INSERT INTO users (name, email, password)
     VALUES ($1, $2, $3)
   ;`;
-  const values = [ user.name, user.email, user.password ];
-  console.log(values);
   return pool
     .query(queryString, values)
     .then(result => (result.rows[0]) ? result.rows[0] : null)
@@ -74,9 +72,19 @@ exports.addUser = addUser;
  * @param {string} guest_id The id of the user.
  * @return {Promise<[{}]>} A promise to the reservations.
  */
-const getAllReservations = function(guest_id, limit = 10) {
-  return getAllProperties(null, 2);
-}
+const getAllReservations = (guest_id, limit = 10) => {
+  const values = [guest_id, limit];
+  const queryString = `SELECT *
+    FROM reservations
+    JOIN properties on property_id = properties.id
+    WHERE guest_id = $1
+    LIMIT $2
+  ;`;
+  return pool
+  .query(queryString, values)
+  .then(result => result.rows)
+  .catch(err => err.message);
+};
 exports.getAllReservations = getAllReservations;
 
 /// Properties
@@ -88,10 +96,11 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = (options, limit = 10) => {
+  const values = [limit];
   const queryString = `SELECT * FROM properties
     LIMIT $1;`;
   return pool
-    .query(queryString, [ limit ])
+    .query(queryString, values)
     .then(result => result.rows)
     .catch(err => err.message);
   };
