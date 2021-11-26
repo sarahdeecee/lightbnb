@@ -105,45 +105,58 @@ const getAllProperties = (options, limit = 10) => {
   JOIN property_reviews on properties.id = property_id
   `;
   let keyword = 'WHERE';
+  
+  // Add the owner_id to the query string to properties not owned by the user
   if (options.owner_id) {
     values.push(options.owner_id);
     queryString += `${keyword} owner_id NOT $${count} `;
     keyword = 'AND';
     count++;
   }
+
+  // Add the city query to the query string
   if (options.city) {
     values.push(options.city);
     queryString += `${keyword} city LIKE '%$${count}%' `;
     keyword = 'AND';
     count++;
   }
+
+  // Add the min price per night query to the query string
   if (options.minimum_price_per_night) {
     values.push(Number(options.minimum_price_per_night) * 100);
     queryString += `${keyword} cost_per_night >= $${count} `;
     keyword = 'AND';
     count++;
   }
+
+  // Add the max price per night query to the query string
   if (options.maximum_price_per_night) {
     values.push(Number(options.maximum_price_per_night) * 100);
     queryString += `${keyword} cost_per_night <= $${count} `;
     count++;
   }
+
+  // Add the ordering and grouping to the query string
   queryString += `
   ORDER BY cost_per_night ASC
   GROUP BY properties.id
   `;
+
+  // Add the rating query to the query string
   if (options.minimum_rating) {
     keyword = 'HAVING';
     values.push(Number(options.minimum_rating));
     queryString += `${keyword} avg(rating) >= $${count}`;
     count++;
   }
+
+  // Add the limit to the query string
   values.push(limit);
   queryString += `
   LIMIT $${count};
   `;
-  console.log(queryString);
-  console.log(values);
+
   return pool
     .query(queryString, values)
     .then(result => {
