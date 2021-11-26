@@ -1,6 +1,6 @@
 const properties = require('./json/properties.json');
 const users = require('./json/users.json');
-const { Pool } = require('pg')
+const { Pool } = require('pg');
 const pool = new Pool({
   user: 'vagrant',
   password: '123',
@@ -15,7 +15,7 @@ const pool = new Pool({
  * @param {String} email The email of the user.
  * @return {Promise<{}>} A promise to the user.
  */
- const getUserWithEmail = (email) => {
+const getUserWithEmail = (email) => {
   const queryString = `
     SELECT * FROM users
     WHERE email = $1
@@ -24,7 +24,7 @@ const pool = new Pool({
     .query(queryString, [ email.toLowerCase() ])
     .then((result) => result.rows[0])
     .catch((err) => err.message);
-  };
+};
 exports.getUserWithEmail = getUserWithEmail;
 
 /**
@@ -43,7 +43,7 @@ const getUserWithId = (id) => {
     .query(queryString, values)
     .then(result => result.rows[0])
     .catch(err => err.message);
-  };
+};
 exports.getUserWithId = getUserWithId;
 
 
@@ -52,7 +52,7 @@ exports.getUserWithId = getUserWithId;
  * @param {{name: string, password: string, email: string}} user
  * @return {Promise<{}>} A promise to the user.
  */
- const addUser = user => {
+const addUser = user => {
   const values = [ user.name, user.email, user.password ];
   const queryString = `
     INSERT INTO users (name, email, password)
@@ -62,7 +62,7 @@ exports.getUserWithId = getUserWithId;
     .query(queryString, values)
     .then(result => (result.rows[0]) ? result.rows[0] : null)
     .catch(err => err.message);
-  };
+};
 exports.addUser = addUser;
 
 /// Reservations
@@ -81,9 +81,9 @@ const getAllReservations = (guest_id, limit = 10) => {
     LIMIT $2
   ;`;
   return pool
-  .query(queryString, values)
-  .then(result => result.rows)
-  .catch(err => err.message);
+    .query(queryString, values)
+    .then(result => result.rows)
+    .catch(err => err.message);
 };
 exports.getAllReservations = getAllReservations;
 
@@ -96,75 +96,60 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = (options, limit = 10) => {
-  console.log("options:",options);
+  console.log("options:", options);
   const values = [];
-  let count = 1;
   let queryString = `
-  SELECT properties.id, title, cost_per_night, avg(rating) as average_rating
+  SELECT properties.*, avg(rating) as average_rating
   FROM properties
   JOIN property_reviews on properties.id = property_id
   `;
   let keyword = 'WHERE';
-  
-  // Add the owner_id to the query string to properties not owned by the user
-  if (options.owner_id) {
-    values.push(options.owner_id);
-    queryString += `${keyword} owner_id NOT $${count} `;
-    keyword = 'AND';
-    count++;
-  }
 
   // Add the city query to the query string
   if (options.city) {
-    values.push(options.city);
-    queryString += `${keyword} city LIKE '%$${count}%' `;
+    values.push(`%${options.city}%`);
+    queryString += `${keyword} city LIKE $${values.length} `;
     keyword = 'AND';
-    count++;
   }
 
   // Add the min price per night query to the query string
   if (options.minimum_price_per_night) {
-    values.push(Number(options.minimum_price_per_night) * 100);
-    queryString += `${keyword} cost_per_night >= $${count} `;
+    values.push(options.minimum_price_per_night * 100);
+    queryString += `${keyword} cost_per_night >= $${values.length} `;
     keyword = 'AND';
-    count++;
   }
 
   // Add the max price per night query to the query string
   if (options.maximum_price_per_night) {
-    values.push(Number(options.maximum_price_per_night) * 100);
-    queryString += `${keyword} cost_per_night <= $${count} `;
-    count++;
+    values.push(options.maximum_price_per_night * 100);
+    queryString += `${keyword} cost_per_night <= $${values.length} `;
   }
 
   // Add the ordering and grouping to the query string
   queryString += `
-  ORDER BY cost_per_night ASC
   GROUP BY properties.id
   `;
 
   // Add the rating query to the query string
   if (options.minimum_rating) {
     keyword = 'HAVING';
-    values.push(Number(options.minimum_rating));
-    queryString += `${keyword} avg(rating) >= $${count}`;
-    count++;
+    values.push(options.minimum_rating);
+    queryString += `${keyword} avg(rating) >= $${values.length}`;
   }
 
   // Add the limit to the query string
   values.push(limit);
   queryString += `
-  LIMIT $${count};
+  ORDER BY cost_per_night ASC
+  LIMIT $${values.length};
   `;
-
+  console.log(values);
+  console.log(queryString);
   return pool
     .query(queryString, values)
-    .then(result => {
-      console.log(result.rows);
-      result.rows;
-    })
-    .catch(err => err.message);
-  };
+    .then(result => result.rows)
+    .catch(err => console.error(err.message));
+};
 exports.getAllProperties = getAllProperties;
 
 /**
@@ -172,10 +157,51 @@ exports.getAllProperties = getAllProperties;
  * @param {{}} property An object containing all of the property details.
  * @return {Promise<{}>} A promise to the property.
  */
-const addProperty = function(property) {
-  const propertyId = Object.keys(properties).length + 1;
-  property.id = propertyId;
-  properties[propertyId] = property;
-  return Promise.resolve(property);
-}
+const addProperty = property => {
+  console.log("property:",property);
+  const values = [];
+  const numberValues = ['number_of_bedrooms', 'number_of_bathrooms', 'parking_spaces'];
+  for (let value in property) {
+    if (numberValues.includes(value)) {
+      values.push(Number(property[value]));
+    } else {
+      values.push(property[value]);
+    }
+  }
+  const keys = Object.keys(property);
+  let keyString = "";
+  let valueString = "";
+
+  keys.forEach(key => {
+    if (keyString === '') {
+      keyString += `${key}`;
+    } else {
+      keyString += `, ${key}`;
+    }
+  });
+  
+  for (let i = 1; i <= values.length; i++) {
+    if (i === values.length) {
+      valueString += `$${i}`;
+    } else {
+      valueString += `$${i}, `;
+    }
+  }
+  
+  const queryString = `
+  INSERT INTO properties (title, description, number_of_bedrooms, number_of_bathrooms, parking_spaces, cost_per_night, thumbnail_photo_url, cover_photo_url, street, country, city, province, post_code, owner_id)
+  VALUES (${valueString})
+  RETURNING *;
+  `;
+  
+  console.log('keyString',keyString);
+  console.log('valueString',valueString);
+  console.log('values',values);
+  console.log('queryString',queryString);
+
+  return pool
+    .query(queryString, values)
+    .then(result => result.rows)
+    .catch(err => console.error(err.message));
+};
 exports.addProperty = addProperty;
