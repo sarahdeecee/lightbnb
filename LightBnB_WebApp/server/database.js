@@ -96,7 +96,6 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = (options, limit = 10) => {
-  console.log("options:", options);
   const values = [];
   let queryString = `
   SELECT properties.*, avg(rating) as average_rating
@@ -143,8 +142,6 @@ const getAllProperties = (options, limit = 10) => {
   ORDER BY cost_per_night ASC
   LIMIT $${values.length};
   `;
-  console.log(values);
-  console.log(queryString);
   return pool
     .query(queryString, values)
     .then(result => result.rows)
@@ -158,7 +155,6 @@ exports.getAllProperties = getAllProperties;
  * @return {Promise<{}>} A promise to the property.
  */
 const addProperty = property => {
-  console.log("property:",property);
   const values = [];
   const numberValues = ['number_of_bedrooms', 'number_of_bathrooms', 'parking_spaces'];
   for (let value in property) {
@@ -193,11 +189,6 @@ const addProperty = property => {
   VALUES (${valueString})
   RETURNING *;
   `;
-  
-  console.log('keyString',keyString);
-  console.log('valueString',valueString);
-  console.log('values',values);
-  console.log('queryString',queryString);
 
   return pool
     .query(queryString, values)
